@@ -1,28 +1,103 @@
-name: Build wheels
+name: Build wheels AND Upload Python Package
 
-on: [push]
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+    - '*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build wheels on ${{ matrix.os.name }}
+    runs-on: ${{ matrix.os.name }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - name: "ubuntu-22.04"
+            platform: "linux"
+            platform_id: "manylinux_x86_64"
+
+          - name: "ubuntu-22.04-arm"
+            platform: "linux"
+            platform_id: "manylinux_aarch64"
+
+          - name: "macos-13"
+            platform: "macos"
+            min_macos_version: "13"
+            platform_id: "macosx_x86_64"
+
+          - name: "macos-14"
+            platform: "macos"
+            min_macos_version: "14"
+            platform_id: "macosx_arm64"
+
+          - name: "windows-2022"
+            platform: "windows"
+            platform_id: "win_amd64"  
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Set up QEMU
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.2
+        uses: pypa/cibuildwheel@v2.23.0
         env:
+          CIBW_ARCHS_LINUX: ${{ runner.arch == 'X64' && 'auto ppc64le s390x' || 'auto armv7l' }}
           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
           CIBW_TEST_REQUIRES: tox
           CIBW_TEST_COMMAND: cd {project} && tox
-          CIBW_TEST_SKIP: "*-win*"
+          CIBW_TEST_SKIP: "*"
           CIBW_BUILD_VERBOSITY: 1
 
       - name: Store wheels
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
+          name: dist-${{ matrix.os.name }}-${{ strategy.job-index }}
           path: ./wheelhouse/*.whl
+
+  publish:
+    name: Publish wheels to PyPI
+    needs: build_wheels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Twine
+        run: |
+          pip install twine
+          cd dist && for i in $(ls); do mv ${i}/*.whl .; rmdir ${i}; done && cd ..
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          artifacts: "dist/*.whl"
+          tag: "TgCrypto-${{ github.ref_name }}"
+          commit: ${{ github.sha }}
+
+      - name: Publish wheels to PyPI
+        run: twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
