@@ -18,33 +18,28 @@ jobs:
     strategy:
       matrix:
         os:
-          - name: "ubuntu-22.04"
+          - name: "ubuntu-24.04"
             platform: "linux"
             platform_id: "manylinux_x86_64"
 
-          - name: "ubuntu-22.04-arm"
+          - name: "ubuntu-24.04-arm"
             platform: "linux"
             platform_id: "manylinux_aarch64"
-
-          - name: "macos-13"
-            platform: "macos"
-            min_macos_version: "13"
-            platform_id: "macosx_x86_64"
 
           - name: "macos-14"
             platform: "macos"
             min_macos_version: "14"
             platform_id: "macosx_arm64"
 
-          - name: "windows-2022"
+          - name: "windows-2025"
             platform: "windows"
-            platform_id: "win_amd64"  
+            platform_id: "win_amd64"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
-      
+
       - name: Set up QEMU
         if: runner.os == 'Linux' && runner.arch == 'X64'
         uses: docker/setup-qemu-action@v3
@@ -52,10 +47,16 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.0
+        uses: pypa/cibuildwheel@v3.3.1
         env:
+          # 1. Enable PyPy builds (Required in v3+)
+          CIBW_ENABLE: pypy
+          # 2. Configure Architectures
           CIBW_ARCHS_LINUX: ${{ runner.arch == 'X64' && 'auto ppc64le s390x' || 'auto armv7l' }}
           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
+          # SKIP ALL FREE-THREADING BUILDS (t-suffix)
+          CIBW_SKIP: "*t-*"
+          # 3. Build & Test Settings
           CIBW_TEST_REQUIRES: tox
           CIBW_TEST_COMMAND: cd {project} && tox
           CIBW_TEST_SKIP: "*"
@@ -82,7 +83,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install Twine
         run: |

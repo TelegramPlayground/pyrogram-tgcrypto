@@ -22,8 +22,8 @@ with open("README.md", encoding="utf-8") as f:
     readme = f.read()
 
 setup(
-    name="PyTgCrypto",
-    version="1.2.11",
+    name="pytgcrypto",
+    version="1.2.12",
     description="Fast and Portable Cryptography Extension Library for Pyrogram",
     long_description=readme,
     long_description_content_type="text/markdown",
@@ -47,6 +47,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Programming Language :: Python :: Implementation",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
